@@ -77,7 +77,17 @@ class Executor:
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
+            min_score = self.config.executor.get("min_score")
+            if min_score is not None:
+                before_filter_count = len(reranked_papers)
+                reranked_papers = [p for p in reranked_papers if p.score is not None and p.score >= min_score]
+                logger.info(
+                    f"Filtered papers by min_score={min_score}: {before_filter_count} -> {len(reranked_papers)}"
+                )
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            if len(reranked_papers) == 0 and not self.config.executor.send_empty:
+                logger.info("No papers remain after score filtering. No email will be sent.")
+                return
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)

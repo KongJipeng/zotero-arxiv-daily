@@ -25,4 +25,7 @@ source:
 
 executor:
   debug: ${oc.env:DEBUG,null}
+  send_empty: true
+  max_paper_num: 50
+  min_score: 4
   source: ['arxiv']
