@@ -17,9 +17,11 @@ llm:
   generation_kwargs:
     model: gpt-4o-mini
 
+# For embodied AI. 
 source:
   arxiv:
-    category: ["cs.AI","cs.CV","cs.LG","cs.CL"]
+    category: ["cs.RO","cs.CV","cs.AI","cs.LG","cs.CL","cs.SY","eess.SY"]
+    include_cross_list: false # Set to true to include arXiv cross-list papers in these categories.
 
 executor:
   debug: ${oc.env:DEBUG,null}
