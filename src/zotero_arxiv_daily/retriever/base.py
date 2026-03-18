@@ -5,8 +5,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 from typing import Type
 from loguru import logger
+
 class BaseRetriever(ABC):
     name: str
+
     def __init__(self, config:DictConfig):
         self.config = config
         self.retriever_config = getattr(config.source,self.name)
@@ -27,7 +29,13 @@ class BaseRetriever(ABC):
             futures = {exec_pool.submit(self.convert_to_paper, rp): i for i, rp in enumerate(raw_papers)}
             papers = [None] * len(raw_papers)
             for future in tqdm(as_completed(futures), total=len(raw_papers), desc="Converting papers"):
-                papers[futures[future]] = future.result()
+                paper_idx = futures[future]
+                try:
+                    papers[paper_idx] = future.result()
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to convert paper at index {paper_idx}: {type(e).__name__}: {e}"
+                    )
         return [p for p in papers if p is not None]
 
 registered_retrievers = {}

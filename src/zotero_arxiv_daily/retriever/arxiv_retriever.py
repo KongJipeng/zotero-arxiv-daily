@@ -7,11 +7,13 @@ from tempfile import TemporaryDirectory
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import feedparser
 from urllib.request import urlretrieve
+from urllib.error import HTTPError, URLError
 from tqdm import tqdm
 import os
 from loguru import logger
 
 PDF_EXTRACT_TIMEOUT = 180
+
 @register_retriever("arxiv")
 class ArxivRetriever(BaseRetriever):
     def __init__(self, config):
@@ -58,6 +60,9 @@ class ArxivRetriever(BaseRetriever):
         except TimeoutError:
             logger.warning(f"PDF extraction timed out for {raw_paper.title}")
             full_text = None
+        except Exception as e:
+            logger.warning(f"PDF extraction failed for {raw_paper.title}: {type(e).__name__}: {e}")
+            full_text = None
         if full_text is None:
             full_text = extract_text_from_tar(raw_paper)
         return Paper(
@@ -76,7 +81,11 @@ def extract_text_from_pdf(paper: ArxivResult) -> str | None:
         if paper.pdf_url is None:
             logger.warning(f"No PDF URL available for {paper.title}")
             return None
-        urlretrieve(paper.pdf_url, path)
+        try:
+            urlretrieve(paper.pdf_url, path)
+        except (HTTPError, URLError, OSError) as e:
+            logger.warning(f"Failed to download PDF for {paper.title}: {type(e).__name__}: {e}")
+            return None
         try:
             full_text = extract_markdown_from_pdf(path)
         except Exception as e:
@@ -91,7 +100,11 @@ def extract_text_from_tar(paper: ArxivResult) -> str | None:
         if source_url is None:
             logger.warning(f"No source URL available for {paper.title}")
             return None
-        urlretrieve(source_url, path)
+        try:
+            urlretrieve(source_url, path)
+        except (HTTPError, URLError, OSError) as e:
+            logger.warning(f"Failed to download source tar for {paper.title}: {type(e).__name__}: {e}")
+            return None
         try:
             file_contents = extract_tex_code_from_tar(path, paper.entry_id)
             if "all" not in file_contents:
