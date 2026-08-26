@@ -3,7 +3,7 @@ from pyzotero import zotero
 from omegaconf import DictConfig, ListConfig
 from .utils import glob_match
 from .retriever import get_retriever_cls
-from .protocol import CorpusPaper
+from .protocol import CorpusPaper, Paper
 import random
 from datetime import datetime
 from .reranker import get_reranker_cls
@@ -89,6 +89,21 @@ class Executor:
             logger.info(f"Selected {len(corpus)} zotero papers:\n{samples}\n...")
         return corpus
 
+    def filter_papers_by_score(self, papers: list[Paper]) -> list[Paper]:
+        min_score = self.config.executor.get("min_score")
+        if min_score is None:
+            return papers
+
+        filtered_papers = [
+            paper for paper in papers
+            if paper.score is not None and paper.score >= min_score
+        ]
+        logger.info(
+            f"Filtered papers by min_score={min_score}: "
+            f"{len(papers)} -> {len(filtered_papers)}"
+        )
+        return filtered_papers
+
     
     def run(self):
         corpus = self.fetch_zotero_corpus()
@@ -110,7 +125,11 @@ class Executor:
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
+            reranked_papers = self.filter_papers_by_score(reranked_papers)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            if len(reranked_papers) == 0 and not self.config.executor.send_empty:
+                logger.info("No papers remain after relevance filtering. No email will be sent.")
+                return
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)

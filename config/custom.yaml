@@ -24,4 +24,5 @@ source:
 
 executor:
   debug: ${oc.env:DEBUG,null}
+  min_score: null # Set a threshold such as 4 to exclude papers with lower relevance scores.
   source: ['arxiv']

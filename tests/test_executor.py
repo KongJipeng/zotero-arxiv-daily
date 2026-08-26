@@ -100,6 +100,43 @@ def test_filter_corpus_no_filters_returns_all():
 
 
 # ---------------------------------------------------------------------------
+# filter_papers_by_score
+# ---------------------------------------------------------------------------
+
+
+def test_filter_papers_by_score_applies_configured_threshold(config):
+    from omegaconf import open_dict
+
+    from tests.canned_responses import make_sample_paper
+
+    with open_dict(config):
+        config.executor.min_score = 4
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    papers = [
+        make_sample_paper(title="High", score=7.2),
+        make_sample_paper(title="At threshold", score=4.0),
+        make_sample_paper(title="Low", score=3.9),
+        make_sample_paper(title="Unscored", score=None),
+    ]
+
+    filtered = executor.filter_papers_by_score(papers)
+
+    assert [paper.title for paper in filtered] == ["High", "At threshold"]
+
+
+def test_filter_papers_by_score_is_disabled_when_threshold_is_null(config):
+    from tests.canned_responses import make_sample_paper
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    papers = [make_sample_paper(score=None), make_sample_paper(score=1.0)]
+
+    assert executor.filter_papers_by_score(papers) == papers
+
+
+# ---------------------------------------------------------------------------
 # fetch_zotero_corpus
 # ---------------------------------------------------------------------------
 
@@ -243,6 +280,42 @@ def test_run_no_papers_send_empty_false(config, monkeypatch):
     executor.run()
 
     assert len(sent) == 0, "No email should be sent when no papers and send_empty=false"
+
+
+def test_run_no_papers_after_min_score_filter_send_empty_false(config, monkeypatch):
+    """When every paper is below min_score and send_empty=false, no email is sent."""
+    from types import SimpleNamespace
+
+    from omegaconf import open_dict
+
+    from tests.canned_responses import make_sample_corpus, make_sample_paper
+
+    with open_dict(config):
+        config.executor.min_score = 4
+        config.executor.max_paper_num = 100
+        config.executor.send_empty = False
+
+    low_score_paper = make_sample_paper(score=3.9)
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    executor.fetch_zotero_corpus = lambda: make_sample_corpus(1)
+    executor.filter_corpus = lambda corpus: corpus
+    executor.retrievers = {
+        "stub": SimpleNamespace(retrieve_papers=lambda: [low_score_paper]),
+    }
+    executor.reranker = SimpleNamespace(rerank=lambda papers, corpus: papers)
+    executor.openai_client = None
+
+    sent = []
+    monkeypatch.setattr("zotero_arxiv_daily.executor.render_email", lambda papers: "email")
+    monkeypatch.setattr(
+        "zotero_arxiv_daily.executor.send_email",
+        lambda config, content: sent.append(content),
+    )
+
+    executor.run()
+
+    assert sent == []
 
 
 def test_run_no_papers_send_empty_true(config, monkeypatch):
