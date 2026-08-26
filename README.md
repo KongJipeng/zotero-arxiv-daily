@@ -69,10 +69,11 @@ Below are all the secrets you need to set. They are invisible to anyone includin
 | OPENAI_API_KEY | API Key when using the API to access LLMs. You can get FREE API for using advanced open source LLMs in [SiliconFlow](https://cloud.siliconflow.cn/i/b3XhBRAm). | sk-xxx |
 | OPENAI_API_BASE | API URL when using the API to access LLMs. | https://api.siliconflow.cn/v1 |
 
-Then you should also set a public variable `CUSTOM_CONFIG` for your custom configuration.
+You can set a public variable `CUSTOM_CONFIG` to override the repository's `config/custom.yaml`.
+When `CUSTOM_CONFIG` is unset or empty, the workflow keeps and uses the repository configuration file instead.
 ![vars](./assets/repo_var.png)
 ![custom_config](./assets/config_var.png)
-Paste the following content into the value of `CUSTOM_CONFIG` variable:
+To use the variable override, paste the following content into `CUSTOM_CONFIG`:
 ```yaml
 zotero:
   user_id: ${oc.env:ZOTERO_ID}
@@ -101,6 +102,7 @@ source:
 
 executor:
   debug: ${oc.env:DEBUG,null}
+  min_score: null # Set a threshold such as 4 to exclude papers with lower relevance scores.
   source: ['arxiv']
 ```
 Set `source.arxiv.include_cross_list: true` if you want cross-listed papers included.
@@ -159,6 +161,7 @@ reranker:
 executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
+  min_score: null # The minimum relevance score required for a paper to be included. Set to null to disable filtering. Example: 4
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv','chemrxiv']
   reranker: local # The reranker to use. Example: 'local' or 'api'
